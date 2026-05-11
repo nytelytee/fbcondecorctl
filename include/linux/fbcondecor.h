@@ -24,19 +24,43 @@ struct fbcondecor_command
 	__u64 set_image;    /* Pointer to image, or NULL if turning off */
 };
 
-// Flag to send to the ioctl
-#define FBCONDECOR_FLAG_QUERY 0
-#define FBCONDECOR_FLAG_GET_GEOMETRY 1
-#define FBCONDECOR_FLAG_GET_IMAGE 2
-#define FBCONDECOR_FLAG_SET_GEOMETRY 4
-#define FBCONDECOR_FLAG_SET_IMAGE 8
-
-// The response from the ioctl, can also be treated as a flag
-#define FBCONDECOR_STATE_OFF 0
-#define FBCONDECOR_STATE_GEOMETRY 1
-#define FBCONDECOR_STATE_IMAGE 2
-#define FBCONDECOR_STATE_FULL 3
-
 #define FBIO_CONDECOR _IOWR('F', 0x19, struct fbcondecor_command)
+
+// Flag to send to the ioctl
+#define FBCONDECOR_COMMAND_FLAG_QUERY 0
+#define FBCONDECOR_COMMAND_FLAG_GET_GEOMETRY 1
+#define FBCONDECOR_COMMAND_FLAG_GET_IMAGE 2
+#define FBCONDECOR_COMMAND_FLAG_SET_GEOMETRY 4
+#define FBCONDECOR_COMMAND_FLAG_SET_IMAGE 8
+
+// Flags for the response from the ioctl
+#define FBCONDECOR_STATE_FLAG_GEOMETRY 1
+#define FBCONDECOR_STATE_FLAG_IMAGE 2
+#define FBCONDECOR_STATE_FLAG_VC_ROTATION_LOW 4 
+#define FBCONDECOR_STATE_FLAG_VC_ROTATION_HIGH 8
+      
+// Utilities for interfacing with the state flags
+#define FBCONDECOR_STATE_HAS_GEOMETRY(state) (\
+      (state) & FBCONDECOR_STATE_FLAG_GEOMETRY\
+)
+
+#define FBCONDECOR_STATE_HAS_IMAGE(state) (\
+      (state) & FBCONDECOR_STATE_FLAG_IMAGE\
+)
+
+#define FBCONDECOR_STATE_HAS_SWAPPED_DIMENSIONS(state) (\
+      (state) & FBCONDECOR_STATE_FLAG_VC_ROTATION_LOW\
+)
+
+#define FBCONDECOR_ROTATION_SHIFT 2
+
+#define FBCONDECOR_STATE_GET_ROTATION(state) (\
+      (\
+      	(state) & (\
+      		FBCONDECOR_STATE_FLAG_VC_ROTATION_LOW |\
+      		FBCONDECOR_STATE_FLAG_VC_ROTATION_HIGH\
+      	)\
+      ) >> FBCONDECOR_ROTATION_SHIFT\
+)
 
 #endif

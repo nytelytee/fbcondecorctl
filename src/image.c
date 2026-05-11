@@ -16,6 +16,7 @@
 #include <png.h>           // for PNG_LIBPNG_VER_STRING, png_create_info_struct
 #include <setjmp.h>        // for setjmp
 #include <stdio.h>         // for NULL, FILE
+#include <stdbool.h>       // for bool
 #include <stdlib.h>        // for free, malloc
 #include <types.h>         // for fb_data, u8, u32
 
@@ -122,7 +123,7 @@ u8* read_png_as_framebuffer(FILE* fp) {
     return data;
 }
 
-int write_framebuffer_as_png(FILE* fp, u8 *data) {
+int write_framebuffer_as_png(FILE* fp, u8 *data, bool swap_dimensions) {
     if (!fp) return -1;
     if (!data) return -1;
 
@@ -138,17 +139,20 @@ int write_framebuffer_as_png(FILE* fp, u8 *data) {
 
     png_init_io(png_ptr, fp);
 
-    png_set_IHDR(png_ptr, info_ptr, fbd.var.xres, fbd.var.yres, 8, 
+    unsigned int xres = swap_dimensions ? fbd.var.yres : fbd.var.xres;
+    unsigned int yres = swap_dimensions ? fbd.var.xres : fbd.var.yres;
+
+    png_set_IHDR(png_ptr, info_ptr, xres, yres, 8, 
                  PNG_COLOR_TYPE_RGB_ALPHA, PNG_INTERLACE_NONE, 
                  PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
     png_write_info(png_ptr, info_ptr);
 
-    row = malloc(fbd.var.xres * 4);
+    row = malloc(xres * 4);
 
-    for (u32 y = 0; y < fbd.var.yres; y++) {
-        u8 *src_row = data + (fbd.var.xres * 4 * y);
+    for (u32 y = 0; y < yres; y++) {
+        u8 *src_row = data + (xres * 4 * y);
         
-        for (__u32 x = 0; x < fbd.var.xres; x++) {
+        for (__u32 x = 0; x < xres; x++) {
             u8 r, g, b;
             get_pixel(&r, &g, &b, src_row + (x * 4));
             

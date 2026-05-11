@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #define PACKAGE "fbcondecorctl"
-#define VERSION "1.0"
+#define VERSION "1.1"
 
 #define PATH_DEV	"/dev"
 #define PATH_PROC	"/proc"
@@ -27,7 +27,7 @@
 #define max(a,b)		((a) > (b) ? (a) : (b))
 
 #define iprint(type, ...) do {				\
-	if (type <= MSG_ERROR) {					\
+	if (type <= MSG_INFO) {					\
 		fprintf(stderr, ## __VA_ARGS__);				\
 	}											\
 } while (0);

@@ -65,8 +65,6 @@ PACKAGE "-" VERSION "\n"
 "NOTE: the currently selected tty is not the tty you are currently viewing, but the tty to perform the action on.\n"
 "  tty      <tty_number>                                              change the currently selected tty (default is the currently viewed tty, use 0 to use the currently viewed tty)\n"
 "Slot manipulation commands:\n"
-"A slot is essentially a variable that holds data, you reference a slot by a number; initially, it starts off containing nothing (which is valid input for both set-image and set-geometry)\n"
-"The slot 0 is special and always contains nothing, you cannot write to it. A slot has to be between 0 and 100.\n"
 "  set-slot <slot-to-set> <slot>                                      make one slot hold the same data as another\n"
 "  read-geometry <slot> <filename>                                    read the contents of the file into a slot as geometry in the form <offset_x> <offset_y> <width> <height>\n"
 "  read-image <slot> <filename>                                       read the contents of the file into a slot as a png image\n"
@@ -91,9 +89,28 @@ PACKAGE "-" VERSION "\n"
 "  set <geometry-slot> <image-slot>                               alias for set-geometry-set-image\n"
 "  get <geometry-slot> <image-slot>                               alias for get-geometry-get-image\n"
 "  swap <geometry-slot> <image-slot>                              alias for swap-geometry-swap-image\n"
-
+"\n"
+	);
+	printf(
 "Options:\n"
 "  -h, --help               show this help message\n"
+"\n"
+"Concepts:\n"
+"A slot is essentially a variable that holds data, you reference a slot by a number; initially, it starts off containing nothing (which is valid input for both set-image and set-geometry)\n"
+"The slot 0 is special and always contains nothing, you cannot write to it. A slot has to be between 0 and 100.\n"
+"\n"
+"A geometry is a set of 4 integers describing the dimensions of a virtual console.\n"
+"offset_x and offset_y refer to the offset from the top left corner (or other corners, see below)\n"
+"width and height refer to the width and height of the actual console\n"
+"keep in mind that in cases of rotated consoles, the offset refers to the offset from the 'origin' of the origin of the console itself, not the screen;\n"
+"similarly, width refers to the horizontal span of the console (i.e. the direction in which the columns grow), and height refers to the vertical span (i.e. the direction in which the rows grow).\n"
+"If you have no idea what this means, don't worry about it; on a standard non-rotated consoles, the meaning is obvious:\n"
+"a geometry '4 5 1912 1070' means:\n"
+"  start drawing the console offset from the left side by 4 pixels, and make it 1912 pixels wide\n"
+"  start drawing the console offset from the top by 5 pixels and make it 1070 pixels wide\n"
+"if you need to rotate your console for whatever reason, just know that the offset and size are relative to the rotated coordinate system of your console\n\n"
+"An image is the background image that will be displayed in your console. It needs to be of the exact same dimensions as your monitor "
+"(or mirrored dimensions in case of clockwise or counter-clockwise monitor rotations, in this case the image is always oriented the same way as the console)\n"
 );
 }
 
@@ -175,7 +192,11 @@ void write_file(int slot, const char* filename) {
 		break;
 	case SLOT_IMAGE:
 		if (!slots[slot].data) break;
-		write_framebuffer_as_png(fp, slots[slot].data);
+		write_framebuffer_as_png(fp, slots[slot].data, false);
+		break;
+	case SLOT_IMAGE_SWAPPED:
+		if (!slots[slot].data) break;
+		write_framebuffer_as_png(fp, slots[slot].data, true);
 		break;
 	}
 	fflush(fp);
@@ -240,7 +261,7 @@ int main(int argc, char **argv)
 			slots[slot_to_set].type = SLOT_GEOMETRY;
 			if (!execute) continue;
 			read_file(slot_to_set, filename);
-			if (slots[slot_to_set].type == SLOT_IMAGE) {
+			if (slots[slot_to_set].type == SLOT_IMAGE || slots[slot_to_set].type == SLOT_IMAGE_SWAPPED) {
 				iprint(MSG_ERROR, "RUNTIME ERROR in command %d. Expected a geometry, got an image.\n", command);
 				exit(1);
 			}
@@ -289,7 +310,7 @@ int main(int argc, char **argv)
 			if (ops.image_op != OP_NONE) image_slot  = parse_slot(argv[++i], command, ops.image_op == OP_SET ? 0 : 1);
 
 			if (ops.geometry_op == OP_SET || ops.geometry_op == OP_SWAP) {
-				if (slots[geometry_slot].type == SLOT_IMAGE) {
+				if (slots[geometry_slot].type == SLOT_IMAGE || slots[geometry_slot].type == SLOT_IMAGE_SWAPPED) {
 					iprint(MSG_ERROR, "Error in geometry slot in command %d. Expected geometry data, got image.\n", command);
 					exit(1);
 				}
@@ -306,25 +327,25 @@ int main(int argc, char **argv)
 
 			if (!execute) continue;
 			u16 flags = 0;
-			flags |= (ops.geometry_op == OP_SET || ops.geometry_op == OP_SWAP) ? FBCONDECOR_FLAG_SET_GEOMETRY : 0;
-			flags |= (ops.geometry_op == OP_GET || ops.geometry_op == OP_SWAP) ? FBCONDECOR_FLAG_GET_GEOMETRY : 0;
-			flags |= (ops.image_op == OP_SET || ops.image_op == OP_SWAP) ? FBCONDECOR_FLAG_SET_IMAGE : 0;
-			flags |= (ops.image_op == OP_GET || ops.image_op == OP_SWAP) ? FBCONDECOR_FLAG_GET_IMAGE : 0;
+			flags |= (ops.geometry_op == OP_SET || ops.geometry_op == OP_SWAP) ? FBCONDECOR_COMMAND_FLAG_SET_GEOMETRY : 0;
+			flags |= (ops.geometry_op == OP_GET || ops.geometry_op == OP_SWAP) ? FBCONDECOR_COMMAND_FLAG_GET_GEOMETRY : 0;
+			flags |= (ops.image_op == OP_SET || ops.image_op == OP_SWAP) ? FBCONDECOR_COMMAND_FLAG_SET_IMAGE : 0;
+			flags |= (ops.image_op == OP_GET || ops.image_op == OP_SWAP) ? FBCONDECOR_COMMAND_FLAG_GET_IMAGE : 0;
 
 			struct fbcondecor_geometry* get_geometry = NULL;
-			if (flags & FBCONDECOR_FLAG_GET_GEOMETRY)
+			if (flags & FBCONDECOR_COMMAND_FLAG_GET_GEOMETRY)
 				get_geometry = malloc(sizeof(struct fbcondecor_geometry));
 			
 			u8* get_image = NULL;
-			if (flags & FBCONDECOR_FLAG_GET_IMAGE)
+			if (flags & FBCONDECOR_COMMAND_FLAG_GET_IMAGE)
 				get_image = malloc(4 * fbd.var.xres * fbd.var.yres);
 
 			struct fbcondecor_geometry* set_geometry = NULL;
-			if (flags & FBCONDECOR_FLAG_SET_GEOMETRY)
+			if (flags & FBCONDECOR_COMMAND_FLAG_SET_GEOMETRY)
 				set_geometry = (struct fbcondecor_geometry*) slots[geometry_slot].data;
 			
 			u8* set_image = NULL;
-			if (flags & FBCONDECOR_FLAG_SET_IMAGE)
+			if (flags & FBCONDECOR_COMMAND_FLAG_SET_IMAGE)
 				set_image = slots[image_slot].data;
 
 			int result = fbcondecor_execute_raw_command(
@@ -340,16 +361,20 @@ int main(int argc, char **argv)
 				iprint(MSG_ERROR, "Runtime error in command %d. Fbcondecor ioctl failed with code %d\n", command, result);
 				exit(1);
 			}
-			if (flags & FBCONDECOR_FLAG_GET_GEOMETRY) {
-				if (result & FBCONDECOR_STATE_GEOMETRY) slots[geometry_slot].data = (u8*) get_geometry;
+			if (flags & FBCONDECOR_COMMAND_FLAG_GET_GEOMETRY) {
+				if (FBCONDECOR_STATE_HAS_GEOMETRY(result)) slots[geometry_slot].data = (u8*) get_geometry;
 				else {
 					free(get_geometry);
 					slots[geometry_slot].data = NULL;
 				}
 			}
 
-			if (flags & FBCONDECOR_FLAG_GET_IMAGE) {
-				if (result & FBCONDECOR_STATE_IMAGE) slots[image_slot].data = get_image;
+			if (flags & FBCONDECOR_COMMAND_FLAG_GET_IMAGE) {
+				if (FBCONDECOR_STATE_HAS_IMAGE(result)) {
+					slots[image_slot].data = get_image;
+					if (FBCONDECOR_STATE_HAS_SWAPPED_DIMENSIONS(result))
+						slots[image_slot].type = SLOT_IMAGE_SWAPPED;
+				}
 				else {
 					free(get_image);
 					slots[image_slot].data = NULL;

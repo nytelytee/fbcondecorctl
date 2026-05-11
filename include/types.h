@@ -15,6 +15,7 @@ typedef int32_t		s32;
 #define SLOT_NOTHING 0
 #define SLOT_GEOMETRY 1
 #define SLOT_IMAGE 2
+#define SLOT_IMAGE_SWAPPED 3
 struct slot { int type; u8* data; };
 
 #define OP_NONE 0
